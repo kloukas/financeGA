@@ -1,7 +1,7 @@
 """GA Analysis"""
 import random
 import numpy as np
-
+import math
 
 class GAAnalysis(object):
     def __init__(self, dataFile, memory=5, noStrategies=3000):
@@ -24,21 +24,33 @@ class GAAnalysis(object):
             self.strategies[sId][1] = 0
 
     def scoreStrategies(self, inputStr):
-        """Simple scoring function, +1 if correctly predicted, 0 otherwise. Sort desc"""
+        """Simple scoring function, +1 if correctly predicted, +0 otherwise. Sort asc"""
         history = inputStr[:-1]
         nextState = inputStr[-1:]
         for i in range(0, self.noStrategies):
             if self.strategies[i][0][int(history, 2)] == nextState:
                 self.strategies[i][1] += 1
-        self.strategies.sort(key=lambda score: score[1], reverse=True)
+        self.strategies.sort(key=lambda score: score[1])
 
-    def tournament(self):
-        curr = [None, 0]
-        for _ in range(0, 2):
-            strat = self.strategies[random.randrange(0, self.noStrategies, 1)]
-            if strat[1] > curr[1]:
-                curr = strat
-        return curr[0]
+    def debugSelect(self):
+        while True:
+            try:
+                ran = random.random()
+                stratRank=int(math.ceil((math.sqrt(1+4*ran*self.noStrategies*(self.noStrategies+1)-1))/2))
+                stratRank=min(self.noStrategies,stratRank) #Floating point math is weird, sometimes goes above 3000. Proper fix in the future
+                print self.strategies[stratRank-1]
+            except:
+                print ran
+                print (math.sqrt(1+4*ran*self.noStrategies*(self.noStrategies+1)-1))/2
+                print stratRank
+                break
+
+    def select(self):
+                ran = random.random()
+                stratRank=int(math.ceil((math.sqrt(1+4*ran*self.noStrategies*(self.noStrategies+1)-1))/2))
+                stratRank=min(self.noStrategies,stratRank) #Floating point math is weird, sometimes goes above 3000. Proper fix in the future
+                return self.strategies[stratRank-1]
+
 
     def generateMask(self, maskP):
         rand = np.random.rand(self.memPower,) < maskP
@@ -48,13 +60,13 @@ class GAAnalysis(object):
         return mask
 
     def evolve(self, retain=0.2):
-        """Replace worst strategies"""
+        """Elitist Selection"""
         retain = int(retain*self.noStrategies)
-        newgen = self.strategies[:retain]  # Elitist Selection, retain portion of fittest strategies
-        # Tournament Selection, Uniform Crossover, Uniform Mutation
+        newgen = self.strategies[-retain:]  # Elitist Selection, retain portion of fittest strategies
+        # Rank Based Proportional Selection, Uniform Crossover, Uniform Mutation
         while len(newgen) < len(self.strategies):
-            parent1 = int(self.tournament(), 2)
-            parent2 = int(self.tournament(), 2)
+            parent1 = int(self.select()[0], 2)
+            parent2 = int(self.select()[0], 2)
             xMask = self.generateMask(0.5)
             mMask1 = self.generateMask(0.01)
             mMask2 = self.generateMask(0.01)
@@ -65,7 +77,6 @@ class GAAnalysis(object):
             newgen.append([child1, 0])
             newgen.append([child2, 0])
         self.strategies = newgen
-        self.strategies.sort(key=lambda score: score[1], reverse=True)
 
     def run(self):
         with open(self.dataFile) as dataFile:
@@ -80,3 +91,6 @@ class GAAnalysis(object):
 if __name__ == '__main__':
     GAA = GAAnalysis("data.txt")
     GAA.run()
+    print GAA.strategies[:10]
+    GAA.evolve()
+    print GAA.strategies[:10]
