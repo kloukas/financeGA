@@ -35,10 +35,8 @@ class GAAnalysis(object):
 
     def select(self):
         ran = random.random()
-        stratRank=int(math.ceil((math.sqrt(1+4*ran*self.noStrategies*(self.noStrategies+1)-1))/2))
-        stratRank=min(self.noStrategies,stratRank) #Floating point math is weird, sometimes goes above index. Proper fix in the future
+        stratrank=int(math.ceil((math.sqrt(1+4*ran*self.noStrategies*(self.noStrategies+1))-1)/2))
         return self.strategies[stratRank-1]
-
 
     def generateMask(self, maskP):
         rand = np.random.rand(self.memPower,) < maskP
@@ -111,4 +109,4 @@ class GAAnalysis(object):
 if __name__ == '__main__':
     GAA = GAAnalysis("data.txt")
     GAA.runOnce()
-    print GAA.strategies
+    GAA.debugSelect()
