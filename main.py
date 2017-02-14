@@ -2,111 +2,122 @@
 import random
 import numpy as np
 import math
+import csv
 
 class GAAnalysis(object):
     def __init__(self, dataFile, memory=5, noStrategies=3000):
         self.memory = memory
         self.noStrategies = noStrategies
         self.dataFile = dataFile
-        self.maxGen = -1
-        self.strategies = []
+        self.maxGen = 200
         self.memPower = pow(2, self.memory)
         self.generateStrategies()
-        self.targetAcc = 0.65
+        self.targetAcc = 0.80
 
     def generateStrategies(self):
         maxStrat = pow(2, self.memPower)-1
         #strategies = random.sample(xrange(maxStrat), self.noStrategies)
-        strategies = np.random.randint(0,maxStrat,size=self.noStrategies,dtype=np.int64)#non Unique
-        zero = np.zeros(self.noStrategies,dtype=np.int)
-        self.strategies = np.column_stack((strategies,zero))
+        strategies = np.random.randint(0,high=maxStrat,size=self.noStrategies,dtype=np.int64)#non Unique
+        self.strategies = np.zeros((self.noStrategies,2),dtype=np.int)
+        self.strategies[:,0] += strategies
 
-    def initStrategies(self):
-        for sId in range(0, len(self.strategies)):
-            self.strategies[sId][1] = 0
-
-    def scoreStrategies(self, inputStr):
+    def scoreStrategies(self, history, nextState):
         """Simple scoring function, +1 if correctly predicted, +0 otherwise. Sort asc"""
-        history = inputStr[:-1]
-        nextState = inputStr[-1:]
-        history = inputStr[:-1]
-        nextState = inputStr[-1:]
-        self.strategies[:,1] +=((self.strategies[:,0]&(1<<int(history,2))>0)*1 == int(nextState))*1
+        score = np.apply_along_axis(self.testStrat, 0, np.transpose(self.strategies), history, nextState)
+        self.strategies[:,1] = 0
+        self.strategies[:,1] += score
+        self.strategies = self.strategies[self.strategies[:,1].argsort()]
 
-    def select(self):
-        ran = random.random()
-        stratrank=int(math.ceil((math.sqrt(1+4*ran*self.noStrategies*(self.noStrategies+1))-1)/2))
-        return self.strategies[stratRank-1]
+    def selectParents(self,count):
+        ran = np.random.rand(count)
+        ranks = np.ceil((np.sqrt(1+4*ran*self.noStrategies*(self.noStrategies+1))-1)/2).astype(int)
+        return self.strategies[ranks-1,][:,0].reshape(count/2,2)
 
-    def generateMask(self, maskP):
-        rand = np.random.rand(self.memPower,) < maskP
-        mask = 0
-        for i in range(0, self.memPower):
-            mask += rand[i]*pow(2, i)
-        return mask
+    def generateMasks(self,maskP,count):
+        twos = np.power(np.full(self.memPower, 2, dtype=np.int),range(self.memPower))
+        binary = np.random.rand(self.memPower, count) < maskP
+        return np.einsum("i,ij->j",twos,binary)
 
-    def evolve(self, retain=0.2):
-        """Elitist Selection"""
+    def evolveMatrix(self, retain=0.2):
         retain = int(retain*self.noStrategies)
-        newgen = self.strategies[-retain:]  # Elitist Selection, retain portion of fittest strategies
-        # Rank Based Proportional Selection, Uniform Crossover, Uniform Mutation
-        while len(newgen) < len(self.strategies):
-            parent1 = self.select()[0]
-            parent2 = self.select()[0]
-            xMask = self.generateMask(0.5)
-            mMask1 = self.generateMask(0.01)
-            mMask2 = self.generateMask(0.01)
-            child1 = ((parent1 & ~(xMask)) | (parent2 & xMask)) ^ mMask1
-            child2 = ((parent1 & xMask) | (parent2 & ~(xMask))) ^ mMask2
-            newgen = np.append(newgen, [[child1, 0],[child2,0]],axis=0)
-        self.strategies = newgen
+        generate = self.noStrategies-retain
+        newgen = self.strategies[-retain:][:,0]
+        parents = self.selectParents(generate)
+        xMask = self.generateMasks(0.5,generate/2)
+        mMask = self.generateMasks(0.01,generate).reshape(generate/2,2)
+        children = np.empty((generate/2,2),dtype=np.int)
+        children[:,0] = ((parents[:,0] & ~(xMask)) | (parents[:,1] & xMask))
+        children[:,1] = ((parents[:,1] & ~(xMask)) | (parents[:,0] & xMask))
+        newgen = np.append(newgen, (children ^ mMask).reshape(generate,),axis=0)
+        self.strategies = np.zeros((self.noStrategies,2),dtype=np.int)
+        self.strategies[:,0] += newgen
+
+
+    def testStrat(self, strategies, history, nextState):
+        return np.sum(((strategies[0]&(1<<history))>0)==nextState)
 
     def runOnce(self):
         with open(self.dataFile) as dataFile:
             lines = [line.strip() for line in dataFile]
-        self.initStrategies()
         tries = len(lines[0]) - self.memory
+        history=[]
+        nextState = []
         for i in range(0, tries):
-            inputStr = lines[0][i:i + self.memory+1]
-            self.scoreStrategies(inputStr)
-        self.strategies = self.strategies[self.strategies[:,1].argsort()]
+            history.append(int(lines[0][i:i + self.memory],2))
+            nextState.append(int(lines[0][i+self.memory]))
+        history = np.array(history)
+        nextState = np.array(nextState)
+        print self.strategies
+        self.scoreStrategies(history,nextState)
+        print self.strategies
 
 
     def accuracy(self, noTries):
-        stratAcc = []
-        for strat in self.strategies:
-             stratAcc.append(strat[1]/float(noTries))
+        stratAcc = self.strategies[:,1]/float(noTries)
         return stratAcc
 
     def run(self):
         with open(self.dataFile) as dataFile:
             lines = [line.strip() for line in dataFile]
-        self.initStrategies()
         tries = len(lines[0]) - self.memory
+        history=[]
+        nextState = []
+        for i in range(0, tries):
+            history.append(int(lines[0][i:i + self.memory],2))
+            nextState.append(int(lines[0][i+self.memory]))
+        history = np.array(history)
+        nextState = np.array(nextState)
+
         genAccuracy = []
         gen=0
+        ending=""
         while True:
-            for i in range(0, tries):
-                inputStr = lines[0][i:i + self.memory+1]
-                self.scoreStrategies(inputStr)
+            self.scoreStrategies(history,nextState)
             acc = self.accuracy(tries)
             meanAcc = np.mean(acc)
             maxAcc = max(acc)
             minAcc = min(acc)
-            genAccuracy=(gen,(meanAcc,maxAcc,minAcc))
-            if gen>=self.maxGen:
+            genAccuracy.append((gen,meanAcc,maxAcc,minAcc))
+            print genAccuracy
+            if gen>=self.maxGen and self.maxGen>0:
+                ending="max generations reached"
                 break
-            else:
-                gen +=1
-
-            if maxAcc >= self.targetAcc:
+            elif maxAcc >= self.targetAcc:
+                ending="target accuracy reached"
                 break
             else:
                 gen += 1
+                self.evolveMatrix()
+
+        print "Total number of generations: "+str(gen)
+        print "Ended because "+ending
+        with open('results.csv','wb') as resultsFile:
+            wr = csv.writer(resultsFile, quoting=csv.QUOTE_ALL)
+            wr.writerows(genAccuracy)
+
 
 
 
 if __name__ == '__main__':
     GAA = GAAnalysis("data.txt")
-    GAA.runOnce()
-    GAA.debugSelect()
+    GAA.run()
