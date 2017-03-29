@@ -3,6 +3,7 @@ import numpy as np
 import csv
 import multiprocessing as mp
 import logging
+import traceback
 
 
 
@@ -12,13 +13,12 @@ class GAAnalysis(object):
         self.noStrategies = noStrategies
         self.maxGen = 1000
         self.memPower = pow(2, self.memory)
-        self.generateStrategies()
-        self.targetAcc = 0.90
+        self.targetAcc = 0.99
 
     def generateStrategies(self):
-        maxStrat = pow(2, self.memPower)-1
+        maxStrat = pow(2, self.memPower)
         #strategies = random.sample(xrange(maxStrat), self.noStrategies)
-        strategies = np.random.randint(0,high=maxStrat,size=self.noStrategies,dtype=np.uint64)#non Unique
+        strategies = np.random.randint(0,high=maxStrat,size=self.noStrategies,dtype=np.uint64)#not Unique but probability of duplicate is effectively 0
         self.strategies = np.zeros((self.noStrategies,2),dtype=np.uint64)
         self.strategies[:,0] += strategies
 
@@ -35,8 +35,10 @@ class GAAnalysis(object):
         return self.strategies[ranks-1,][:,0].reshape(count//2,2)
 
     def generateMasks(self,maskP,count):
-        twos = np.power(np.full(self.memPower, 2, dtype=np.uint64),range(self.memPower))
-        binary = np.random.rand(self.memPower, count) < maskP
+        twos = np.power(np.full(self.memPower, 2, dtype=np.uint64),range(self.memPower)) # Vector of powers of 2
+        binary = np.random.rand(self.memPower, count) < maskP # Matrix of mask, each bit has maskP probability to be 1, each column corresponds to one mask
+        # Each column of 'binary' corresponds to one mask. Multiplying each bit with the corresponding power of 2 and summing
+        # gives the decimal representation of the mask
         return np.einsum("i,ij->j",twos,binary).astype(np.uint64)
 
     def evolveMatrix(self, gen, retain=0.1):
@@ -84,10 +86,8 @@ class GAAnalysis(object):
         stratAcc = self.strategies[:,1]/float(noTries)
         return stratAcc
 
-    def test(self, foo):
-        print(foo)
-
     def run(self, line):
+        self.generateStrategies()
         explode = line.split('+')
         name=explode[0]
         signal=explode[1]
@@ -112,6 +112,9 @@ class GAAnalysis(object):
             genAccuracy.append((gen,meanAcc,maxAcc,minAcc))
             #print genAccuracy
             #print gen
+            if gen%10 == 0:
+                print("{}-{} on generation {}".format(name,signal,gen))
+
             if gen>=self.maxGen and self.maxGen>0:
                 ending="max generations were reached"
                 break
@@ -121,26 +124,26 @@ class GAAnalysis(object):
             else:
                 gen += 1
                 self.evolveMatrix(gen)
-            if gen%100 == 0:
-                print("{}-{} on generation {}".format(name,signal,gen))
+        bestStrat=self.strategies[-1]
+        print("{:0b}".format(bestStrat[0]).zfill(self.memPower))
         uniqueStrat = len(np.unique(self.strategies[:,0]))
-        filename = "{}-{}.csv".format(name,signal)
-        with open(filename,'wb') as resultsFile:
+        filename = "results/{}-{}.csv".format(name,signal)
+        with open(filename,'w', newline='') as resultsFile:
             wr = csv.writer(resultsFile, quoting=csv.QUOTE_ALL)
             wr.writerow(['Series',name])
             wr.writerow(['Signal',signal])
             wr.writerow(['Generations',gen])
             wr.writerow(['Ending',ending])
+            wr.writerow(['Best Strategy',"{:0b}".format(bestStrat[0]).zfill(self.memPower)+"\t","Accuracy",bestStrat[1]/float(tries)])
             wr.writerow(['Unique Strats',uniqueStrat])
             wr.writerows(genAccuracy)
         print("{} finished after {} generations because {}".format(name,gen,ending))
 
 
-
 if __name__ == '__main__':
-    GAA = GAAnalysis(memory=3,noStrategies=1000)
-    #with open('201702201205-data.txt') as dataFile:
-    with open('testdata.txt') as dataFile:
+    GAA = GAAnalysis(memory=6,noStrategies=10000)
+    with open('201703151303-data.txt') as dataFile:
+    #with open('testdata.txt') as dataFile:
         lines = [line.strip() for line in dataFile]
     # for i in range(len(lines)):
     #     GAA.run(lines[i])

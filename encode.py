@@ -1,30 +1,14 @@
 import pandas as pd
 import numpy as np
 import datetime
+from os import listdir
+from os.path import isfile, join, splitext
 
-files = [
-'Alphabet 3mth 5min',
-'Alphabet 3yr 1d',
-'British American Tobacco 3mth 5min',
-'British American Tobacco 3yr 1d',
-'Fast Retailing Co 3mth 5min',
-'Fast Retailing Co 3yr 1d',
-'GBPUSD 3mth 5min',
-'GBPUSD 3yr 1d',
-'Lockheed Martin 3mth 5min',
-'Lockheed Martin 3yr 1d',
-'Motor Oil 3mth 5min',
-'Motor Oil 3yr 1d',
-'Tesco 3mth 5min',
-'Tesco 3yr 1d',
-'Toyota 3mth 5min',
-'Toyota 3yr 1d',
-'Unilever N.V. 3mth 5min',
-'Unilever N.V. 3yr 1d'
-]
+mypath="data/"
+files = [splitext(f)[0] for f in listdir(mypath) if (isfile(join(mypath, f)) and f[0] != "~")]
 filename = datetime.datetime.now().strftime('%Y%m%d%H%M')+'-data.txt'
 for dataFile in files:
-    df = pd.read_excel("data/"+dataFile+".xlsx")
+    df = pd.read_excel("data/"+dataFile+".xlsx",skiprows=1)
     highP = df["High"].values[1:]
     lowP = df["Low"].values[1:]
     closeP = df["Close"].values[:-1]
@@ -50,4 +34,4 @@ for dataFile in files:
         textFile.write(cgmaLine+'\n')
         textFile.write(olmiLine+'\n')
         textFile.write(clmiLine+'\n')
-    print "Done with "+dataFile
+    print("Done with "+dataFile)
