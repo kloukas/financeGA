@@ -1,10 +1,14 @@
+"""
+Reads each asset's normalised data file and encodes the price data to a binary
+string according to 5 different rules (1 string per rule generated)
+"""
 import pandas as pd
 import numpy as np
 import datetime
 from os import listdir
 from os.path import isfile, join, splitext
 
-mypath="data/"
+mypath="data/normalised/"
 files = [splitext(f)[0] for f in listdir(mypath) if (isfile(join(mypath, f)) and f[0] != "~")]
 filename = datetime.datetime.now().strftime('%Y%m%d%H%M')+'-data.txt'
 for dataFile in files:

@@ -1,3 +1,7 @@
+"""
+Reads each asset's results file and generates a graph plotting the accuracy of
+the best performing strategy against the number of generations.
+"""
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -34,7 +38,3 @@ for i in range(0,assetNo):
     plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     fig.set_size_inches(8,5)
     fig.savefig(graphPath+header["B"][0].replace(" ","")+"resultsGraph.png",bbox_inches='tight')
-
-# ax.yaxis.set_major_locator(ticker.MultipleLocator(0.02)) # Change 0.02 to 1 for GBPUSD
-# ax.yaxis.set_major_formatter(ticker.FuncFormatter(tickFormatter))
-# fig.suptitle('bold figure suptitle', fontsize=14, fontweight='bold')
